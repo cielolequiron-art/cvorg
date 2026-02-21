@@ -14,23 +14,77 @@ import {
   AlertCircle,
   CheckCircle2,
   X,
-  ExternalLink
+  ExternalLink,
+  Plus,
+  Trash2,
+  Edit,
+  Check,
+  XCircle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Submission } from '../types';
+import { Submission, INITIAL_DATA } from '../types';
 
 interface EntriesExplorerProps {
   submissions: Submission[];
 }
 
 export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions }) => {
+  const [localSubmissions, setLocalSubmissions] = useState<Submission[]>(submissions);
   const [selectedEntry, setSelectedEntry] = useState<Submission | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
-  const filteredEntries = submissions.filter(s => 
+  const filteredEntries = localSubmissions.filter(s => 
     s.form_data.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     s.user_email.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const handleDelete = (id: string) => {
+    if (confirm('Are you sure you want to delete this entry?')) {
+      setLocalSubmissions(prev => prev.filter(s => s.id !== id));
+      setSelectedEntry(null);
+    }
+  };
+
+  const handleStatusUpdate = (id: string, status: 'approved' | 'rejected') => {
+    setLocalSubmissions(prev => prev.map(s => s.id === id ? { ...s, status } : s));
+    if (selectedEntry?.id === id) {
+      setSelectedEntry(prev => prev ? { ...prev, status } : null);
+    }
+  };
+
+  const handleManualAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newEntry: Submission = {
+      id: `man_${Date.now()}`,
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      completion_status: 'complete',
+      last_step_reached: 8,
+      user_email: (e.target as any).email.value,
+      user_phone: (e.target as any).phone.value,
+      form_data: { 
+        ...INITIAL_DATA, 
+        fullName: (e.target as any).fullName.value,
+        carRequested: (e.target as any).carRequested.value
+      }
+    };
+    setLocalSubmissions([newEntry, ...localSubmissions]);
+    setShowManualAdd(false);
+  };
+
+  const updateSelectedEntry = (field: string, value: any, isFormData = true) => {
+    if (!selectedEntry) return;
+    const updated = { ...selectedEntry };
+    if (isFormData) {
+      updated.form_data = { ...updated.form_data, [field]: value };
+    } else {
+      (updated as any)[field] = value;
+    }
+    setSelectedEntry(updated);
+    setLocalSubmissions(prev => prev.map(s => s.id === updated.id ? updated : s));
+  };
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -42,6 +96,12 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
             <p className="text-slate-500 mt-1">Comprehensive view of all data captured from the frontend.</p>
           </div>
           <div className="flex gap-3">
+            <button 
+              onClick={() => setShowManualAdd(true)}
+              className="flex items-center gap-2 bg-blue-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-blue-500 transition-all shadow-lg shadow-blue-600/20 mr-4"
+            >
+              <Plus className="w-5 h-5" /> Add Entry
+            </button>
             <div className="flex bg-slate-100 p-1 rounded-xl mr-2">
               <button className="p-2 hover:bg-white rounded-lg transition-all text-slate-600" title="Export CSV">
                 <FileText className="w-4 h-4" />
@@ -116,6 +176,71 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
         </div>
       </div>
 
+      {/* Manual Add Modal */}
+      <AnimatePresence>
+        {showManualAdd && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-slate-900">Add Manual Entry</h3>
+                <button onClick={() => setShowManualAdd(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-all">
+                  <X className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+              <form onSubmit={handleManualAdd} className="p-8 space-y-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</label>
+                  <input 
+                    name="fullName"
+                    type="text" 
+                    required
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone</label>
+                    <input 
+                      name="phone"
+                      type="tel" 
+                      required
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</label>
+                    <input 
+                      name="email"
+                      type="email" 
+                      required
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Car Requested</label>
+                  <input 
+                    name="carRequested"
+                    type="text" 
+                    required
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                    placeholder="e.g. Ford Fusion 2014"
+                  />
+                </div>
+                <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl">
+                  Create Manual Entry
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Full Detail Modal */}
       <AnimatePresence>
         {selectedEntry && (
@@ -136,12 +261,46 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                     <p className="text-slate-500 text-sm">Application ID: {selectedEntry.id}</p>
                   </div>
                 </div>
-                <button 
-                  onClick={() => setSelectedEntry(null)}
-                  className="p-3 hover:bg-slate-200 rounded-2xl transition-all"
-                >
-                  <X className="w-6 h-6 text-slate-500" />
-                </button>
+                <div className="flex items-center gap-3">
+                  <div className="flex bg-white p-1 rounded-xl border border-slate-200 mr-4">
+                    <button 
+                      onClick={() => handleStatusUpdate(selectedEntry.id, 'approved')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+                        selectedEntry.status === 'approved' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <Check className="w-4 h-4" /> Approve
+                    </button>
+                    <button 
+                      onClick={() => handleStatusUpdate(selectedEntry.id, 'rejected')}
+                      className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs transition-all ${
+                        selectedEntry.status === 'rejected' ? 'bg-rose-500 text-white shadow-lg shadow-rose-500/20' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'
+                      }`}
+                    >
+                      <XCircle className="w-4 h-4" /> Reject
+                    </button>
+                  </div>
+                  <button 
+                    onClick={() => setIsEditing(!isEditing)}
+                    className={`p-3 rounded-2xl transition-all ${isEditing ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    title="Edit Entry"
+                  >
+                    <Edit className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(selectedEntry.id)}
+                    className="p-3 bg-rose-50 text-rose-600 rounded-2xl hover:bg-rose-100 transition-all"
+                    title="Delete Entry"
+                  >
+                    <Trash2 className="w-5 h-5" />
+                  </button>
+                  <button 
+                    onClick={() => setSelectedEntry(null)}
+                    className="p-3 hover:bg-slate-200 rounded-2xl transition-all"
+                  >
+                    <X className="w-6 h-6 text-slate-500" />
+                  </button>
+                </div>
               </div>
 
               <div className="flex-1 overflow-auto p-10 grid grid-cols-3 gap-10">
@@ -152,14 +311,14 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                       <User className="w-4 h-4 text-blue-500" /> Personal Information
                     </h4>
                     <div className="space-y-4">
-                      <DetailField label="Full Name" value={selectedEntry.form_data.fullName} />
-                      <DetailField label="Date of Birth" value={selectedEntry.form_data.dob} />
-                      <DetailField label="Phone" value={selectedEntry.form_data.phone} />
-                      <DetailField label="Email" value={selectedEntry.user_email} />
-                      <DetailField label="Address" value={`${selectedEntry.form_data.address}, ${selectedEntry.form_data.city}, ${selectedEntry.form_data.state} ${selectedEntry.form_data.zip}`} />
+                      <DetailField label="Full Name" value={selectedEntry.form_data.fullName} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('fullName', v)} />
+                      <DetailField label="Date of Birth" value={selectedEntry.form_data.dob} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('dob', v)} />
+                      <DetailField label="Phone" value={selectedEntry.form_data.phone} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('phone', v)} />
+                      <DetailField label="Email" value={selectedEntry.user_email} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('user_email', v, false)} />
+                      <DetailField label="Address" value={selectedEntry.form_data.address} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('address', v)} />
                       <div className="pt-4 border-t border-slate-100">
-                        <DetailField label="Emergency Contact" value={selectedEntry.form_data.emergencyName} />
-                        <DetailField label="Emergency Phone" value={selectedEntry.form_data.emergencyPhone} />
+                        <DetailField label="Emergency Contact" value={selectedEntry.form_data.emergencyName} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('emergencyName', v)} />
+                        <DetailField label="Emergency Phone" value={selectedEntry.form_data.emergencyPhone} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('emergencyPhone', v)} />
                       </div>
                     </div>
                   </section>
@@ -169,9 +328,9 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                       <Shield className="w-4 h-4 text-indigo-500" /> License Details
                     </h4>
                     <div className="space-y-4">
-                      <DetailField label="License Number" value={selectedEntry.form_data.licenseNumber} />
-                      <DetailField label="State" value={selectedEntry.form_data.licenseState} />
-                      <DetailField label="Expiration" value={selectedEntry.form_data.licenseExpiration} />
+                      <DetailField label="License Number" value={selectedEntry.form_data.licenseNumber} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('licenseNumber', v)} />
+                      <DetailField label="State" value={selectedEntry.form_data.licenseState} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('licenseState', v)} />
+                      <DetailField label="Expiration" value={selectedEntry.form_data.licenseExpiration} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('licenseExpiration', v)} />
                     </div>
                   </section>
                 </div>
@@ -183,10 +342,10 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                       <Car className="w-4 h-4 text-emerald-500" /> Rental Details
                     </h4>
                     <div className="space-y-4">
-                      <DetailField label="Vehicle Requested" value={selectedEntry.form_data.carRequested} />
-                      <DetailField label="Start Date" value={selectedEntry.form_data.startDate} />
-                      <DetailField label="End Date" value={selectedEntry.form_data.endDate} />
-                      <DetailField label="Usage Type" value={selectedEntry.form_data.usageType} />
+                      <DetailField label="Vehicle Requested" value={selectedEntry.form_data.carRequested} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('carRequested', v)} />
+                      <DetailField label="Start Date" value={selectedEntry.form_data.startDate} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('startDate', v)} />
+                      <DetailField label="End Date" value={selectedEntry.form_data.endDate} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('endDate', v)} />
+                      <DetailField label="Usage Type" value={selectedEntry.form_data.usageType} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('usageType', v)} />
                     </div>
                   </section>
 
@@ -195,11 +354,11 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                       <Shield className="w-4 h-4 text-blue-500" /> Insurance
                     </h4>
                     <div className="space-y-4">
-                      <DetailField label="Has Insurance?" value={selectedEntry.form_data.hasInsurance} />
+                      <DetailField label="Has Insurance?" value={selectedEntry.form_data.hasInsurance} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('hasInsurance', v)} />
                       {selectedEntry.form_data.hasInsurance === 'yes' && (
                         <>
-                          <DetailField label="Company" value={selectedEntry.form_data.insuranceCompany} />
-                          <DetailField label="Policy #" value={selectedEntry.form_data.policyNumber} />
+                          <DetailField label="Company" value={selectedEntry.form_data.insuranceCompany} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('insuranceCompany', v)} />
+                          <DetailField label="Policy #" value={selectedEntry.form_data.policyNumber} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('policyNumber', v)} />
                         </>
                       )}
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
@@ -214,7 +373,7 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                       <CreditCard className="w-4 h-4 text-amber-500" /> Payment
                     </h4>
                     <div className="space-y-4">
-                      <DetailField label="Method" value={selectedEntry.form_data.paymentMethod} />
+                      <DetailField label="Method" value={selectedEntry.form_data.paymentMethod} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('paymentMethod', v)} />
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                         {selectedEntry.form_data.depositAgreement ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <AlertCircle className="w-4 h-4 text-rose-500" />}
                         Deposit Agreement Accepted
@@ -230,9 +389,9 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
                       <AlertCircle className="w-4 h-4 text-rose-500" /> History & Screening
                     </h4>
                     <div className="space-y-4">
-                      <DetailField label="Accidents" value={selectedEntry.form_data.historyAccidents} />
-                      <DetailField label="DUI" value={selectedEntry.form_data.historyDUI} />
-                      <DetailField label="Suspension" value={selectedEntry.form_data.historySuspension} />
+                      <DetailField label="Accidents" value={selectedEntry.form_data.historyAccidents} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('historyAccidents', v)} />
+                      <DetailField label="DUI" value={selectedEntry.form_data.historyDUI} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('historyDUI', v)} />
+                      <DetailField label="Suspension" value={selectedEntry.form_data.historySuspension} isEditing={isEditing} onChange={(v: any) => updateSelectedEntry('historySuspension', v)} />
                       <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
                         {selectedEntry.form_data.screeningConsent ? <CheckCircle2 className="w-4 h-4 text-emerald-500" /> : <AlertCircle className="w-4 h-4 text-rose-500" />}
                         Screening Consent Provided
@@ -273,10 +432,19 @@ export const EntriesExplorer: React.FC<EntriesExplorerProps> = ({ submissions })
   );
 };
 
-const DetailField = ({ label, value }: any) => (
+const DetailField = ({ label, value, isEditing, onChange }: any) => (
   <div>
     <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{label}</p>
-    <p className="text-sm font-semibold text-slate-700">{value || 'Not Provided'}</p>
+    {isEditing ? (
+      <input 
+        type="text" 
+        value={value || ''} 
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-1.5 bg-slate-50 border border-slate-200 rounded-lg text-sm font-semibold text-slate-700 focus:border-blue-500 outline-none"
+      />
+    ) : (
+      <p className="text-sm font-semibold text-slate-700">{value || 'Not Provided'}</p>
+    )}
   </div>
 );
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { INITIAL_DATA, FormData, Submission, Campaign, SubmissionStatus } from './types';
+import { INITIAL_DATA, FormData, Submission, Campaign, SubmissionStatus, FormSchema } from './types';
 import { StepWizard } from './components/StepWizard';
 import { Input, Select, FileUpload, Checkbox, DateEntry } from './components/InputFields';
 import { SignaturePad } from './components/SignaturePad';
@@ -31,20 +31,10 @@ import { EntriesExplorer } from './components/EntriesExplorer';
 import { VehicleManager } from './components/VehicleManager';
 import { SocialMediaManager } from './components/SocialMediaManager';
 import { AIChatbot } from './components/AIChatbot';
+import { AdminLogin } from './components/AdminLogin';
+import { DEFAULT_SCHEMA } from './constants/defaultSchema';
 import { Menu } from 'lucide-react';
 
-const STEPS = [
-  "Personal Info",
-  "License",
-  "Rental",
-  "Insurance",
-  "Payment",
-  "History",
-  "Rules",
-  "Sign"
-];
-
-// Mock Submissions Data
 const MOCK_SUBMISSIONS: Submission[] = [
   {
     id: 'sub_1',
@@ -80,12 +70,15 @@ const MOCK_SUBMISSIONS: Submission[] = [
 
 export default function App() {
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showLogin, setShowLogin] = useState(false);
   const [activeAdminTab, setActiveAdminTab] = useState('dashboard');
   const [submissions, setSubmissions] = useState<Submission[]>(MOCK_SUBMISSIONS);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
+  const [activeSchema, setActiveSchema] = useState<FormSchema>(DEFAULT_SCHEMA);
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<FormData>(INITIAL_DATA);
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
@@ -181,7 +174,7 @@ export default function App() {
   };
 
   const handleNext = () => {
-    if (currentStep < STEPS.length - 1) {
+    if (currentStep < activeSchema.schema.steps.length - 1) {
       window.scrollTo({ top: 0, behavior: 'smooth' });
       setCurrentStep(c => c + 1);
     }
@@ -219,13 +212,28 @@ export default function App() {
     setCampaigns(prev => [newCampaign, ...prev]);
   };
 
-  if (isAdmin) {
+  if (showLogin && !isAuthenticated) {
+    return (
+      <AdminLogin 
+        onLogin={(success) => {
+          if (success) {
+            setIsAuthenticated(true);
+            setIsAdmin(true);
+            setShowLogin(false);
+          }
+        }} 
+        onBack={() => setShowLogin(false)} 
+      />
+    );
+  }
+
+  if (isAdmin && isAuthenticated) {
     return (
       <div className="flex h-screen bg-slate-50 overflow-hidden font-sans relative">
         <AdminSidebar 
           activeTab={activeAdminTab} 
           setActiveTab={setActiveAdminTab} 
-          onExit={() => setIsAdmin(false)} 
+          onExit={() => { setIsAdmin(false); setIsAuthenticated(false); }} 
           isCollapsed={isSidebarCollapsed}
           setIsCollapsed={setIsSidebarCollapsed}
           isMobileOpen={isMobileSidebarOpen}
@@ -319,7 +327,12 @@ export default function App() {
             {activeAdminTab === 'social-media' && <SocialMediaManager />}
             {activeAdminTab === 'ai-settings' && <AISettings />}
             {activeAdminTab === 'settings' && <SettingsPage />}
-            {activeAdminTab === 'forms' && <FormBuilder />}
+            {activeAdminTab === 'forms' && (
+              <FormBuilder 
+                activeSchema={activeSchema} 
+                onSaveSchema={(schema) => setActiveSchema(schema)} 
+              />
+            )}
           </main>
         </div>
 
@@ -362,6 +375,8 @@ export default function App() {
     return d.toISOString().split('T')[0];
   })() : new Date().toISOString().split('T')[0];
 
+  const currentStepData = activeSchema.schema.steps[currentStep];
+
   return (
     <div className="min-h-screen bg-slate-50 pb-12 font-sans">
       <header className="bg-slate-900 text-white p-4 md:p-6 shadow-md sticky top-0 z-50">
@@ -377,13 +392,6 @@ export default function App() {
           </div>
           <div className="flex items-center gap-3">
             <button 
-              onClick={() => setIsAdmin(true)}
-              className="flex items-center gap-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold py-2 px-4 rounded-full transition-all border border-slate-700"
-            >
-              <ShieldAlert size={14} className="text-amber-400" />
-              Admin Panel
-            </button>
-            <button 
               onClick={fillTestData}
               className="flex items-center gap-2 bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold py-2 px-4 rounded-full shadow-lg transition-all"
             >
@@ -396,7 +404,7 @@ export default function App() {
 
       <main className="max-w-4xl mx-auto mt-4 md:mt-8 px-4">
         <StepWizard 
-          steps={STEPS} 
+          steps={activeSchema.schema.steps.map(s => s.label)} 
           currentStep={currentStep} 
           onStepClick={(step) => setCurrentStep(step)} 
         />
@@ -404,8 +412,8 @@ export default function App() {
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 md:p-8 transition-all relative">
           <div className="mb-6 pb-4 border-b border-slate-100 flex justify-between items-end">
             <div>
-              <h2 className="text-xl md:text-2xl font-bold text-slate-800">{STEPS[currentStep]}</h2>
-              <p className="text-slate-500 text-xs md:text-sm">Step {currentStep + 1} of 8 — <span className="text-blue-500 font-semibold italic">Navigation Unlocked</span></p>
+              <h2 className="text-xl md:text-2xl font-bold text-slate-800">{currentStepData.label}</h2>
+              <p className="text-slate-500 text-xs md:text-sm">Step {currentStep + 1} of {activeSchema.schema.steps.length} — <span className="text-blue-500 font-semibold italic">Navigation Unlocked</span></p>
             </div>
             <div className="text-[10px] md:text-xs text-blue-500 flex items-center gap-1 font-semibold uppercase tracking-tighter">
               <ShieldCheck size={14} />
@@ -414,169 +422,71 @@ export default function App() {
           </div>
 
           <div className="min-h-[350px]">
-            {currentStep === 0 && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 animate-fadeIn">
-                <Input label="Full Legal Name" placeholder="As appears on license" value={formData.fullName} onChange={e => updateField('fullName', e.target.value)} />
-                <DateEntry label="Date of Birth" value={formData.dob} onChange={val => updateField('dob', val)} />
-                <Input label="Phone Number" type="tel" placeholder="(555) 000-0000" value={formData.phone} onChange={e => updateField('phone', e.target.value)} />
-                <Input label="Email Address" type="email" placeholder="you@example.com" value={formData.email} onChange={e => updateField('email', e.target.value)} />
-                <div className="md:col-span-2">
-                  <AddressAutocomplete label="Street Address" value={formData.address} onChange={(val) => updateField('address', val)} onSelect={(data) => {
-                    updateField('address', data.address); updateField('city', data.city); updateField('state', data.state); updateField('zip', data.zip);
-                  }} />
-                </div>
-                <FileUpload 
-                  label="Proof of Address" 
-                  description="Utility bill, bank statement, or official government mail (last 30 days)."
-                  currentFile={formData.proofOfAddress} 
-                  onChange={f => updateField('proofOfAddress', f)} 
-                />
-                <FileUpload 
-                  label="Proof of Income" 
-                  tooltip="Screenshots must clearly show the platform name, your name, and the weekly pay cycle dates."
-                  description="Acceptable proof formats include screenshots of weekly earnings from platforms like DoorDash, Amazon Flex, Uber, or Lyft, ensuring a consistent weekly income."
-                  currentFile={formData.proofOfIncome} 
-                  onChange={f => updateField('proofOfIncome', f)} 
-                />
-              </div>
-            )}
+            <div className={`grid grid-cols-1 md:grid-cols-${currentStepData.gridCols || 1} gap-4 md:gap-6 animate-fadeIn`}>
+              {currentStepData.fields.map((field) => {
+                // Specialized Components
+                if (field.name === 'address') {
+                  return (
+                    <div key={field.id} className="md:col-span-2">
+                      <AddressAutocomplete 
+                        label={field.label} 
+                        value={formData.address} 
+                        onChange={(val) => updateField('address', val)} 
+                        onSelect={(data) => {
+                          updateField('address', data.address); 
+                          updateField('city', data.city); 
+                          updateField('state', data.state); 
+                          updateField('zip', data.zip);
+                        }} 
+                      />
+                    </div>
+                  );
+                }
 
-            {currentStep === 1 && (
-              <div className="space-y-6 animate-fadeIn">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <Input label="License Number" value={formData.licenseNumber} onChange={e => updateField('licenseNumber', e.target.value)} />
-                  <Input label="State of Issue" value={formData.licenseState} onChange={e => updateField('licenseState', e.target.value)} />
-                  <Input label="Expiration Date" type="date" value={formData.licenseExpiration} onChange={e => updateField('licenseExpiration', e.target.value)} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <FileUpload label="License Front" currentFile={formData.licenseFront} onChange={f => updateField('licenseFront', f)} />
-                  <FileUpload label="License Back" currentFile={formData.licenseBack} onChange={f => updateField('licenseBack', f)} />
-                  <FileUpload label="Selfie holding License" currentFile={formData.selfie} onChange={f => updateField('selfie', f)} />
-                </div>
-              </div>
-            )}
+                if (field.name === 'signatureImage') {
+                  return <SignaturePad key={field.id} onChange={dataUrl => updateField('signatureImage', dataUrl)} />;
+                }
 
-            {currentStep === 2 && (
-              <div className="space-y-6 animate-fadeIn">
-                <Select label="Vehicle Requested" value={formData.carRequested} onChange={e => updateField('carRequested', e.target.value)} options={[
-                  { value: 'Ford Fusion 2014 (Black)', label: 'Ford Fusion 2014 (Black)' },
-                  { value: 'Kia Sportage 2017', label: 'Kia Sportage 2017' }
-                ]} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-1">
-                    <Input 
-                      label="Rental Start Date" 
-                      type="date" 
-                      min={new Date().toISOString().split('T')[0]} 
-                      value={formData.startDate} 
-                      onChange={e => updateField('startDate', e.target.value)} 
+                if (field.type === 'text') {
+                  return <Input key={field.id} label={field.label} placeholder={field.placeholder} value={formData[field.name]} onChange={e => updateField(field.name, e.target.value)} />;
+                }
+
+                if (field.type === 'date') {
+                  return <DateEntry key={field.id} label={field.label} value={formData[field.name]} onChange={val => updateField(field.name, val)} />;
+                }
+
+                if (field.type === 'select') {
+                  return <Select key={field.id} label={field.label} value={formData[field.name]} onChange={e => updateField(field.name, e.target.value)} options={field.options || []} />;
+                }
+
+                if (field.type === 'checkbox') {
+                  return <Checkbox key={field.id} checked={formData[field.name]} onChange={e => updateField(field.name, e.target.checked)} label={field.label} />;
+                }
+
+                if (field.type === 'file') {
+                  return (
+                    <FileUpload 
+                      key={field.id}
+                      label={field.label} 
+                      description={field.description}
+                      currentFile={formData[field.name]} 
+                      onChange={f => updateField(field.name, f)} 
                     />
-                    <p className="text-[10px] text-blue-500 font-bold uppercase tracking-tighter">Note: 7-day minimum rental required</p>
-                  </div>
-                  <div className="space-y-1">
-                    <Input 
-                      label="Rental End Date" 
-                      type="date" 
-                      min={minEndDateValue} 
-                      value={formData.endDate} 
-                      onChange={e => updateField('endDate', e.target.value)} 
-                    />
-                    <p className="text-[10px] text-slate-400">Must be at least 1 week after start date.</p>
-                  </div>
-                </div>
-                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <p className="text-xs font-bold text-slate-500 uppercase tracking-tight mb-1">Pickup Location</p>
-                    <p className="text-sm font-medium text-slate-800">5072 Timberhill Drive, San Antonio, Texas 78238</p>
-                </div>
-              </div>
-            )}
+                  );
+                }
 
-            {currentStep === 3 && (
-              <div className="space-y-6 animate-fadeIn">
-                <Select label="Do you have valid auto insurance?" value={formData.hasInsurance} onChange={e => updateField('hasInsurance', e.target.value)} options={[{value:'yes', label:'Yes'}, {value:'no', label:'No'}]} />
-                
-                {formData.hasInsurance === 'no' && (
-                  <div className="bg-blue-50 border border-blue-100 p-5 rounded-2xl flex gap-3 animate-fadeIn">
-                    <Info className="text-blue-500 shrink-0 mt-0.5" size={20} />
-                    <p className="text-sm text-blue-800 leading-relaxed font-medium">
-                      In the event that you do not have active coverage, we will assist you in obtaining the necessary liability insurance. This ensures you remain state-compliant and meet the approval standards for rideshare platforms like Uber and DoorDash.
-                    </p>
-                  </div>
-                )}
+                return null;
+              })}
 
-                {formData.hasInsurance === 'yes' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-fadeIn">
-                    <Input label="Insurance Company" value={formData.insuranceCompany} onChange={e => updateField('insuranceCompany', e.target.value)} />
-                    <Input label="Policy Number" value={formData.policyNumber} onChange={e => updateField('policyNumber', e.target.value)} />
-                  </div>
-                )}
-                
-                <div className="pt-4 border-t">
-                  <Checkbox checked={formData.insuranceAgreement} onChange={e => updateField('insuranceAgreement', e.target.checked)} label="I agree I am responsible for all tickets, tolls, and damages during the rental period." />
-                </div>
-              </div>
-            )}
-
-            {currentStep === 4 && (
-              <div className="space-y-6 animate-fadeIn text-center">
-                <div className="p-8 bg-slate-900 rounded-3xl text-white shadow-xl">
+              {/* Special Logic for Payment Step */}
+              {currentStepData.id === 's5' && (
+                <div className="md:col-span-2 p-8 bg-slate-900 rounded-3xl text-white shadow-xl text-center">
                   <p className="text-slate-400 text-sm mb-2 uppercase tracking-widest font-bold">Security Deposit</p>
                   <p className="text-6xl font-black">${depositAmount}</p>
                   <p className="text-xs text-blue-400 mt-4 font-bold">Age: {age || "--"}</p>
                 </div>
-                <Select label="Payment Method" value={formData.paymentMethod} onChange={e => updateField('paymentMethod', e.target.value)} options={[
-                  {value:'zelle', label:'Zelle'}, 
-                  {value:'cash', label:'Cash'},
-                  {value:'debit', label:'Debit Card'}
-                ]} />
-                <Checkbox checked={formData.depositAgreement} onChange={e => updateField('depositAgreement', e.target.checked)} label="I understand the security deposit requirement and return policy." />
-              </div>
-            )}
-
-            {currentStep === 5 && (
-              <div className="space-y-4 animate-fadeIn">
-                <p className="font-bold text-slate-800 mb-2">Mandatory Disclosures:</p>
-                {['historyAccidents', 'historyDUI', 'historySuspension'].map(k => (
-                  <div key={k} className="flex justify-between items-center p-4 border rounded-2xl bg-white hover:border-blue-200 transition-colors">
-                    <span className="text-sm font-semibold capitalize text-slate-700">Any {k.replace('history', '')}?</span>
-                    <div className="flex gap-6">
-                      <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-600"><input type="radio" className="w-4 h-4" checked={formData[k as keyof FormData] === 'yes'} onChange={() => updateField(k as keyof FormData, 'yes')} /> Yes</label>
-                      <label className="flex items-center gap-2 cursor-pointer font-medium text-slate-600"><input type="radio" className="w-4 h-4" checked={formData[k as keyof FormData] === 'no'} onChange={() => updateField(k as keyof FormData, 'no')} /> No</label>
-                    </div>
-                  </div>
-                ))}
-                <div className="pt-4">
-                  <Checkbox checked={formData.screeningConsent} onChange={e => updateField('screeningConsent', e.target.checked)} label="I consent to DJ Auto Rental verifying my driving history and background." />
-                </div>
-              </div>
-            )}
-
-            {currentStep === 6 && (
-              <div className="space-y-4 animate-fadeIn">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-red-600 font-black flex items-center gap-2 uppercase text-sm"><AlertCircle size={20} /> Strict Vehicle Rules</h3>
-                  <button onClick={() => {
-                    updateField('ruleSmoking', true); updateField('ruleRacing', true); updateField('ruleCrossing', true);
-                    updateField('ruleSubRent', true); updateField('ruleMileage', true); updateField('ruleFuel', true); updateField('ruleReport', true);
-                  }} className="text-[10px] bg-slate-900 text-white px-3 py-1.5 rounded-full hover:bg-slate-800 font-bold uppercase transition-all">I Accept All Terms</button>
-                </div>
-                <div className="grid grid-cols-1 gap-2">
-                  <Checkbox checked={formData.ruleSmoking} onChange={e => updateField('ruleSmoking', e.target.checked)} label="NO Smoking or Drugs (Strictly Enforced)" />
-                  <Checkbox checked={formData.ruleRacing} onChange={e => updateField('ruleRacing', e.target.checked)} label="NO Racing / Reckless Driving" />
-                  <Checkbox checked={formData.ruleCrossing} onChange={e => updateField('ruleCrossing', e.target.checked)} label="NO Crossing state lines" />
-                  <Checkbox checked={formData.ruleSubRent} onChange={e => updateField('ruleSubRent', e.target.checked)} label="NO Sub-renting" />
-                  <Checkbox checked={formData.ruleFuel} onChange={e => updateField('ruleFuel', e.target.checked)} label="Vehicle must be returned with full fuel tank" />
-                </div>
-              </div>
-            )}
-
-            {currentStep === 7 && (
-              <div className="space-y-6 animate-fadeIn">
-                <SignaturePad onChange={dataUrl => updateField('signatureImage', dataUrl)} />
-                <Input label="Printed Name" placeholder="Full Legal Name" value={formData.signatureName} onChange={e => updateField('signatureName', e.target.value)} />
-                <Checkbox checked={formData.finalConsent} onChange={e => updateField('finalConsent', e.target.checked)} label="I confirm all information provided is true and I accept the rental agreement." />
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           <div className="mt-8 flex justify-between pt-6 border-t border-slate-100">
@@ -584,7 +494,7 @@ export default function App() {
               <ChevronLeft size={20} className="mr-1" />
               Back
             </button>
-            {currentStep === STEPS.length - 1 ? (
+            {currentStep === activeSchema.schema.steps.length - 1 ? (
               <button 
                 onClick={handleSubmit} 
                 disabled={isSubmitting} 
@@ -602,7 +512,15 @@ export default function App() {
             )}
           </div>
         </div>
-        <p className="text-center mt-8 text-slate-400 text-[10px] uppercase font-bold tracking-widest">&copy; {new Date().getFullYear()} DJ Auto Rental. 5072 Timberhill Drive, San Antonio, TX.</p>
+        <p className="text-center mt-8 text-slate-400 text-[10px] uppercase font-bold tracking-widest">
+          &copy; {new Date().getFullYear()} DJ Auto Rental. 5072 Timberhill Drive, San Antonio, TX.
+          <span 
+            onClick={() => setShowLogin(true)}
+            className="cursor-pointer text-slate-50/10 hover:text-slate-200 transition-colors ml-1"
+          >
+            ..
+          </span>
+        </p>
       </main>
     </div>
   );

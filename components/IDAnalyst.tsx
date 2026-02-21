@@ -12,7 +12,9 @@ import {
   Fingerprint,
   Upload,
   FileUp,
-  Image as ImageIcon
+  Image as ImageIcon,
+  Plus,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Submission } from '../types';
@@ -24,8 +26,23 @@ interface IDAnalystProps {
 export const IDAnalyst: React.FC<IDAnalystProps> = ({ submissions }) => {
   const [selectedSub, setSelectedSub] = useState<Submission | null>(null);
   const [zoomImage, setZoomImage] = useState<string | null>(null);
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [manualEntry, setManualEntry] = useState({
+    fullName: '',
+    phone: '',
+    email: '',
+    idNumber: ''
+  });
 
   const pendingAnalyses = submissions.filter(s => s.completion_status === 'complete');
+
+  const handleManualAdd = (e: React.FormEvent) => {
+    e.preventDefault();
+    // In a real app, this would create a new submission or entry
+    alert('Manual ID entry created successfully!');
+    setShowManualAdd(false);
+    setManualEntry({ fullName: '', phone: '', email: '', idNumber: '' });
+  };
 
   return (
     <div className="flex flex-col h-full bg-slate-50">
@@ -47,6 +64,13 @@ export const IDAnalyst: React.FC<IDAnalystProps> = ({ submissions }) => {
       <div className="flex-1 flex overflow-hidden">
         {/* List */}
         <div className="w-1/3 border-r border-slate-200 overflow-auto p-6 space-y-4">
+          <button 
+            onClick={() => setShowManualAdd(true)}
+            className="w-full py-3 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl flex items-center justify-center gap-2 mb-4"
+          >
+            <Plus className="w-4 h-4" /> New Manual Entry
+          </button>
+          
           {pendingAnalyses.map(sub => (
             <button
               key={sub.id}
@@ -82,12 +106,22 @@ export const IDAnalyst: React.FC<IDAnalystProps> = ({ submissions }) => {
                 </div>
                 <div>
                   <h4 className="font-bold text-slate-900">Manual ID Upload</h4>
-                  <p className="text-xs text-slate-500">Upload a document for forensic analysis without a submission.</p>
+                  <p className="text-xs text-slate-500">Upload documents for forensic analysis (PNG, JPEG, WEBP, MPEG, etc).</p>
                 </div>
               </div>
               <label className="bg-slate-900 text-white px-6 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all cursor-pointer flex items-center gap-2">
                 <Upload className="w-4 h-4" /> Upload Document
-                <input type="file" className="hidden" accept="image/*" />
+                <input 
+                  type="file" 
+                  className="hidden" 
+                  accept="image/*,video/mpeg,video/mp4,video/webm" 
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      alert(`File "${file.name}" uploaded for analysis.`);
+                    }
+                  }}
+                />
               </label>
             </div>
           </div>
@@ -170,6 +204,74 @@ export const IDAnalyst: React.FC<IDAnalystProps> = ({ submissions }) => {
           )}
         </div>
       </div>
+
+      {/* Manual Add Modal */}
+      <AnimatePresence>
+        {showManualAdd && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 bg-slate-50 border-b border-slate-100 flex justify-between items-center">
+                <h3 className="text-2xl font-bold text-slate-900">New Manual ID Entry</h3>
+                <button onClick={() => setShowManualAdd(false)} className="p-2 hover:bg-slate-200 rounded-xl transition-all">
+                  <X className="w-6 h-6 text-slate-500" />
+                </button>
+              </div>
+              <form onSubmit={handleManualAdd} className="p-8 space-y-6">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Full Name</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={manualEntry.fullName}
+                    onChange={e => setManualEntry({...manualEntry, fullName: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Phone</label>
+                    <input 
+                      type="tel" 
+                      required
+                      value={manualEntry.phone}
+                      onChange={e => setManualEntry({...manualEntry, phone: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Email</label>
+                    <input 
+                      type="email" 
+                      required
+                      value={manualEntry.email}
+                      onChange={e => setManualEntry({...manualEntry, email: e.target.value})}
+                      className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID / License Number</label>
+                  <input 
+                    type="text" 
+                    required
+                    value={manualEntry.idNumber}
+                    onChange={e => setManualEntry({...manualEntry, idNumber: e.target.value})}
+                    className="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all font-semibold"
+                  />
+                </div>
+                <button type="submit" className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold hover:bg-slate-800 transition-all shadow-xl">
+                  Create Entry
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Zoom Modal */}
       <AnimatePresence>

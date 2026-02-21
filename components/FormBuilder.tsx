@@ -22,33 +22,24 @@ import {
   Upload
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FormSchema } from '../types';
+import { FormSchema, FormStep, FormField } from '../types';
 
-interface FormField {
-  id: string;
-  name: string;
-  label: string;
-  type: 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'file';
-  required: boolean;
+interface FormBuilderProps {
+  activeSchema: FormSchema;
+  onSaveSchema: (schema: FormSchema) => void;
 }
 
-interface FormStep {
-  id: string;
-  label: string;
-  fields: FormField[];
-}
-
-export const FormBuilder: React.FC = () => {
+export const FormBuilder: React.FC<FormBuilderProps> = ({ activeSchema, onSaveSchema }) => {
   const [forms, setForms] = useState<FormSchema[]>([
+    activeSchema,
     {
-      id: '1',
-      name: 'Standard Rental Application',
-      version: '2.4.0',
-      is_active: true,
+      id: '2',
+      name: 'Short-Term Weekend Form',
+      version: '1.1.0',
+      is_active: false,
       schema: { 
         steps: [
-          { id: 's1', label: 'Personal Info', fields: [{ id: 'f1', name: 'fullName', label: 'Full Name', type: 'text', required: true }] },
-          { id: 's2', label: 'License', fields: [{ id: 'f2', name: 'licenseNum', label: 'License Number', type: 'text', required: true }] }
+          { id: 's1', label: 'Basic Info', fields: [] }
         ] 
       }
     }
@@ -64,7 +55,22 @@ export const FormBuilder: React.FC = () => {
     }
   };
 
+  const handleClone = (form: FormSchema) => {
+    const clonedForm: FormSchema = {
+      ...form,
+      id: Date.now().toString(),
+      name: `${form.name} (Copy)`,
+      is_active: false,
+      version: '1.0.0'
+    };
+    setForms([...forms, clonedForm]);
+  };
+
   const handleToggleActive = (id: string) => {
+    const targetForm = forms.find(f => f.id === id);
+    if (targetForm) {
+      onSaveSchema(targetForm);
+    }
     setForms(forms.map(f => ({
       ...f,
       is_active: f.id === id
@@ -74,11 +80,20 @@ export const FormBuilder: React.FC = () => {
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingForm) {
+      let updatedForms;
       if (isCreating) {
-        setForms([...forms, { ...editingForm, id: Date.now().toString() }]);
+        updatedForms = [...forms, { ...editingForm, id: Date.now().toString() }];
       } else {
-        setForms(forms.map(f => f.id === editingForm.id ? editingForm : f));
+        updatedForms = forms.map(f => f.id === editingForm.id ? editingForm : f);
       }
+      
+      setForms(updatedForms);
+      
+      // If the edited form was the active one, update the global state
+      if (editingForm.is_active) {
+        onSaveSchema(editingForm);
+      }
+
       setEditingForm(null);
       setIsCreating(false);
     }
@@ -196,6 +211,13 @@ export const FormBuilder: React.FC = () => {
 
             <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
               <button 
+                onClick={() => handleClone(form)}
+                className="p-3 bg-slate-50 text-slate-600 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all" 
+                title="Clone Form"
+              >
+                <Copy className="w-5 h-5" />
+              </button>
+              <button 
                 onClick={() => setEditingForm(form)}
                 className="p-3 bg-slate-50 text-slate-600 rounded-xl hover:bg-blue-50 hover:text-blue-600 transition-all" 
                 title="Edit Form"
@@ -302,7 +324,7 @@ export const FormBuilder: React.FC = () => {
                 {/* Right: Step Content Editor */}
                 <div className="flex-1 p-10 overflow-auto bg-white">
                   <div className="max-w-3xl mx-auto">
-                    <div className="mb-10 flex items-center justify-between border-b border-slate-100 pb-6">
+                    <div className="mb-10 flex items-center justify-between border-b border-slate-100 pb-6 gap-6">
                       <div className="flex-1">
                         <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Step Label</label>
                         <input 
@@ -317,12 +339,30 @@ export const FormBuilder: React.FC = () => {
                           placeholder="Enter step label..."
                         />
                       </div>
-                      <button 
-                        onClick={() => addField(activeStepIndex)}
-                        className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all"
-                      >
-                        <Plus className="w-4 h-4" /> Add Field
-                      </button>
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block mb-1">Grid Columns</label>
+                          <select 
+                            value={editingForm.schema.steps[activeStepIndex].gridCols || 1}
+                            onChange={(e) => {
+                              const newSteps = [...editingForm.schema.steps];
+                              newSteps[activeStepIndex].gridCols = parseInt(e.target.value) as any;
+                              setEditingForm({ ...editingForm, schema: { ...editingForm.schema, steps: newSteps } });
+                            }}
+                            className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold outline-none"
+                          >
+                            <option value={1}>1 Column</option>
+                            <option value={2}>2 Columns</option>
+                            <option value={3}>3 Columns</option>
+                          </select>
+                        </div>
+                        <button 
+                          onClick={() => addField(activeStepIndex)}
+                          className="flex items-center gap-2 bg-slate-900 text-white px-5 py-2.5 rounded-xl font-bold text-sm hover:bg-slate-800 transition-all self-end"
+                        >
+                          <Plus className="w-4 h-4" /> Add Field
+                        </button>
+                      </div>
                     </div>
 
                     <div className="space-y-4">
@@ -346,7 +386,7 @@ export const FormBuilder: React.FC = () => {
                               <div className="col-span-1 flex items-center justify-center">
                                 <GripVertical className="w-5 h-5 text-slate-300 cursor-grab" />
                               </div>
-                              <div className="col-span-4 space-y-1.5">
+                              <div className="col-span-3 space-y-1.5">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Field Label</label>
                                 <input 
                                   type="text" 
@@ -355,7 +395,17 @@ export const FormBuilder: React.FC = () => {
                                   className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm font-semibold"
                                 />
                               </div>
-                              <div className="col-span-3 space-y-1.5">
+                              <div className="col-span-2 space-y-1.5">
+                                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Internal Name</label>
+                                <input 
+                                  type="text" 
+                                  value={field.name}
+                                  onChange={(e) => updateField(activeStepIndex, fIndex, { name: e.target.value })}
+                                  className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-sm font-semibold"
+                                  placeholder="e.g. fullName"
+                                />
+                              </div>
+                              <div className="col-span-2 space-y-1.5">
                                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Type</label>
                                 <div className="relative">
                                   <select 
@@ -373,7 +423,7 @@ export const FormBuilder: React.FC = () => {
                                   <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 pointer-events-none" />
                                 </div>
                               </div>
-                              <div className="col-span-3 flex items-center gap-4 h-[46px]">
+                              <div className="col-span-2 flex items-center gap-4 h-[46px]">
                                 <label className="flex items-center gap-2 cursor-pointer">
                                   <input 
                                     type="checkbox" 
@@ -384,13 +434,57 @@ export const FormBuilder: React.FC = () => {
                                   <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">Required</span>
                                 </label>
                               </div>
-                              <div className="col-span-1 flex justify-end">
+                              <div className="col-span-2 flex justify-end h-[46px]">
                                 <button 
                                   onClick={() => removeField(activeStepIndex, fIndex)}
-                                  className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                                  className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-all"
                                 >
                                   <Trash2 className="w-5 h-5" />
                                 </button>
+                              </div>
+
+                              {/* Additional Options for Select */}
+                              {field.type === 'select' && (
+                                <div className="col-span-11 col-start-2 mt-2 p-4 bg-white rounded-2xl border border-slate-200 space-y-3">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest block">Dropdown Options (Value:Label, one per line)</label>
+                                  <textarea 
+                                    className="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono outline-none focus:border-blue-500 transition-all"
+                                    rows={3}
+                                    value={field.options?.map((o: any) => `${o.value}:${o.label}`).join('\n') || ''}
+                                    onChange={(e) => {
+                                      const options = e.target.value.split('\n').filter(l => l.includes(':')).map(l => {
+                                        const [value, label] = l.split(':');
+                                        return { value: value.trim(), label: label.trim() };
+                                      });
+                                      updateField(activeStepIndex, fIndex, { options });
+                                    }}
+                                    placeholder="yes:Yes&#10;no:No"
+                                  />
+                                </div>
+                              )}
+
+                              {/* Placeholder & Description */}
+                              <div className="col-span-11 col-start-2 mt-2 grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Placeholder</label>
+                                  <input 
+                                    type="text" 
+                                    value={field.placeholder || ''}
+                                    onChange={(e) => updateField(activeStepIndex, fIndex, { placeholder: e.target.value })}
+                                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-xs"
+                                    placeholder="e.g. Enter your name..."
+                                  />
+                                </div>
+                                <div className="space-y-1.5">
+                                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Description / Tooltip</label>
+                                  <input 
+                                    type="text" 
+                                    value={field.description || ''}
+                                    onChange={(e) => updateField(activeStepIndex, fIndex, { description: e.target.value })}
+                                    className="w-full px-4 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-blue-500 transition-all text-xs"
+                                    placeholder="Help text for the user..."
+                                  />
+                                </div>
                               </div>
                             </div>
                           </motion.div>

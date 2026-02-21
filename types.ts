@@ -1,4 +1,4 @@
-export interface FormData {
+export interface FormData extends Record<string, any> {
   // 1. Personal Info
   fullName: string;
   dob: string;
@@ -82,12 +82,32 @@ export interface Campaign {
   status: 'scheduled' | 'sent' | 'failed';
 }
 
+export interface FormField {
+  id: string;
+  name: string;
+  label: string;
+  type: 'text' | 'number' | 'date' | 'select' | 'checkbox' | 'file';
+  required: boolean;
+  options?: { value: string; label: string }[];
+  placeholder?: string;
+  description?: string;
+}
+
+export interface FormStep {
+  id: string;
+  label: string;
+  fields: FormField[];
+  gridCols?: 1 | 2 | 3;
+}
+
 export interface FormSchema {
   id: string;
   name: string;
   version: string;
-  schema: any;
   is_active: boolean;
+  schema: {
+    steps: FormStep[];
+  };
 }
 
 export interface AppSettings {
